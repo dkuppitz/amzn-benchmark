@@ -21,25 +21,24 @@ public class KeyLoader extends VertexLoader<String> {
     private final static ConcurrentMap<String, AtomicLong> counterMap = new ConcurrentHashMap<>();
     
     private final String key;
+    private final String message;
     private final AtomicLong counter;
     
     public KeyLoader(final String key) {
         this.key = key;
+        this.message = String.format("%s :: {0}", key.toUpperCase());
         counterMap.putIfAbsent(key, new AtomicLong(0L));
         this.counter = counterMap.get(key);
     }
 
     @Override
     public void run() {
-        try {
+        if (!"unknown".equals(this.entity)) {
             final Vertex v = this.graph.addVertex(null);
             v.setProperty(key, this.entity);
             if (counter.incrementAndGet()%batchSize == 0L) {
-                logger.log(Level.INFO, String.format("%s :: %d", key.toUpperCase(), counter.get()));
+                logger.log(Level.INFO, this.message, counter.get());
             }
-        }
-        finally {
-            this.loader.notifyEntityDone();
         }
     }
 }

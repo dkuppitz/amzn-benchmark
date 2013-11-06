@@ -30,24 +30,22 @@ public class CategoryLinkLoader extends EntityLoader<CategoryRelations> {
 
     @Override
     public void run() {
-        try {
-            final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, entity.ASIN).iterator();
-            if (productItty.hasNext()) {
-                final Vertex product = productItty.next();
-                for (final String[] path : entity.paths) {
-                    CategoryCache parent = categoryCache;
-                    for (final String name : path) {
-                        parent = parent.getOrCreateChildCategory(graph, name);
-                    }
-                    graph.getVertex(parent.getVertexId()).addEdge(Schema.Labels.HAS_PRODUCT, product);
+        final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, entity.ASIN).iterator();
+        if (productItty.hasNext()) {
+            final Vertex product = productItty.next();
+            for (final String[] path : entity.paths) {
+                CategoryCache parent = categoryCache;
+                for (final String name : path) {
+                    parent = parent.getOrCreateChildCategory(graph, name);
                 }
-                if (counter.incrementAndGet()%batchSize == 0L) {
-                    logger.log(Level.INFO, "CATEGORY LINKS :: {0}", counter.get());
-                }
+                graph.getVertex(parent.getVertexId()).addEdge(Schema.Labels.HAS_PRODUCT, product);
+            }
+            if (counter.incrementAndGet()%batchSize == 0L) {
+                logger.log(Level.INFO, "CATEGORY LINKS :: {0}", counter.get());
             }
         }
-        finally {
-            this.loader.notifyEntityDone();
+        else {
+            logger.log(Level.WARNING, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
         }
     }
 

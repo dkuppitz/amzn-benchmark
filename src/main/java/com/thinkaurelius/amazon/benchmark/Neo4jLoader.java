@@ -37,9 +37,4 @@ public class Neo4jLoader extends GraphLoader<Neo4jGraph> {
         this.graph.createKeyIndex(Schema.Keys.USER_ID, Vertex.class);
         this.graph.commit();
     }
-    
-    @Override
-    protected void commit() {
-        this.graph.commit();
-    }
 }

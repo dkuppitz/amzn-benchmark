@@ -41,9 +41,4 @@ public class OrientLoader extends GraphLoader<OrientGraph> {
         this.graph.createKeyIndex(Schema.Keys.USER_ID, Vertex.class);
         this.graph.commit();
     }
-    
-    @Override
-    protected void commit() {
-        this.graph.commit();
-    }
 }

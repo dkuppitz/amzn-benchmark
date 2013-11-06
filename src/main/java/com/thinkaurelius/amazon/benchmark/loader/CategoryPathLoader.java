@@ -25,56 +25,51 @@ public class CategoryPathLoader extends VertexLoader<String> {
     
     @Override
     public void run() {
-        try {
-            final String[] path = this.entity.split(", ");
-            
-            Vertex parent = null;
-            for (final String name : path) {
-                final Vertex category;
-                if (parent == null) {
-                    final Iterator<Vertex> itty = new GremlinPipeline()
-                            .start(this.graph.getVertices(Schema.Keys.CATEGORY_NAME, name))
-                            .filter(new PipeFunction<Vertex, Boolean>() {
-                                @Override
-                                public Boolean compute(Vertex v) {
-                                    return !v.getEdges(Direction.IN, Schema.Labels.HAS_CATEGORY).iterator().hasNext();
-                                }
-                            }).cast(Vertex.class).iterator();
-                    
-                    if (itty.hasNext()) {
-                        category = itty.next();
-                    }
-                    else {
-                        category = this.graph.addVertex(null);
-                        category.setProperty(Schema.Keys.CATEGORY_NAME, name);
-                        if (counter.incrementAndGet()%batchSize == 0L) {
-                            logger.log(Level.INFO, "CATEGORIES :: {0}", counter.get());
-                        }
-                    }
+        final String[] path = this.entity.split(", ");
+
+        Vertex parent = null;
+        for (final String name : path) {
+            final Vertex category;
+            if (parent == null) {
+                final Iterator<Vertex> itty = new GremlinPipeline()
+                        .start(this.graph.getVertices(Schema.Keys.CATEGORY_NAME, name))
+                        .filter(new PipeFunction<Vertex, Boolean>() {
+                            @Override
+                            public Boolean compute(Vertex v) {
+                                return !v.getEdges(Direction.IN, Schema.Labels.HAS_CATEGORY).iterator().hasNext();
+                            }
+                        }).cast(Vertex.class).iterator();
+
+                if (itty.hasNext()) {
+                    category = itty.next();
                 }
                 else {
-                    final Iterator<Vertex> itty = new GremlinPipeline(parent)
-                            .out(Schema.Labels.HAS_CATEGORY)
-                            .has(Schema.Keys.CATEGORY_NAME, name)
-                            .cast(Vertex.class).iterator();
-                    
-                    if (itty.hasNext()) {
-                        category = itty.next();
-                    }
-                    else {
-                        category = this.graph.addVertex(null);
-                        category.setProperty(Schema.Keys.CATEGORY_NAME, name);
-                        parent.addEdge(Schema.Labels.HAS_CATEGORY, category);
-                        if (counter.incrementAndGet()%batchSize == 0L) {
-                            logger.log(Level.INFO, "CATEGORIES :: {0}", counter.get());
-                        }
+                    category = this.graph.addVertex(null);
+                    category.setProperty(Schema.Keys.CATEGORY_NAME, name);
+                    if (counter.incrementAndGet()%batchSize == 0L) {
+                        logger.log(Level.INFO, "CATEGORIES :: {0}", counter.get());
                     }
                 }
-                parent = category;
             }
-        }
-        finally {
-            this.loader.notifyEntityDone();
+            else {
+                final Iterator<Vertex> itty = new GremlinPipeline(parent)
+                        .out(Schema.Labels.HAS_CATEGORY)
+                        .has(Schema.Keys.CATEGORY_NAME, name)
+                        .cast(Vertex.class).iterator();
+
+                if (itty.hasNext()) {
+                    category = itty.next();
+                }
+                else {
+                    category = this.graph.addVertex(null);
+                    category.setProperty(Schema.Keys.CATEGORY_NAME, name);
+                    parent.addEdge(Schema.Labels.HAS_CATEGORY, category);
+                    if (counter.incrementAndGet()%batchSize == 0L) {
+                        logger.log(Level.INFO, "CATEGORIES :: {0}", counter.get());
+                    }
+                }
+            }
+            parent = category;
         }
     }
 }

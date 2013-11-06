@@ -8,16 +8,16 @@ import com.thinkaurelius.amazon.benchmark.entities.*;
 import com.thinkaurelius.amazon.benchmark.input.*;
 import com.thinkaurelius.amazon.benchmark.loader.*;
 import com.tinkerpop.blueprints.Graph;
+import com.tinkerpop.blueprints.ThreadedTransactionalGraph;
+import com.tinkerpop.blueprints.TransactionalGraph;
 import java.io.Closeable;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -31,15 +31,8 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 public abstract class GraphLoader<T extends Graph> implements Closeable {
 
     private final static Logger logger = Logger.getLogger(GraphLoader.class.getName());
+    private final static Integer NUM_CPUS = Runtime.getRuntime().availableProcessors();
     
-    private final static String SKIP_MSG = "Skipping %s. The input file '%s' does not exist.";
-
-    private final static int NUM_CPUS = Runtime.getRuntime().availableProcessors();
-    private final static int MAX_PARALLEL_TASKS = NUM_CPUS << 2;
-
-    private final static Semaphore semaphore = new Semaphore(MAX_PARALLEL_TASKS, true);
-
-    private final AtomicLong counter = new AtomicLong(0L);
     private final ExecutorService executor;
     private final String productASINFilename;
     private final String userIdFilename;
@@ -49,6 +42,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
     private final String categoryLinkFilename;
     private final Boolean compact;
     private final Long batchSize;
+    private final Boolean multithreaded;
 
     protected final Map<String, Object> settings;
     protected T graph;
@@ -70,6 +64,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
 
         this.executor = Executors.newFixedThreadPool(NUM_CPUS);
         this.graph = this.createGraphInstance();
+        this.multithreaded = this.graph.getFeatures().supportsThreadedTransactions;
         this.productASINFilename = (String)this.settings.get("asin");
         this.userIdFilename = (String)this.settings.get("users");
         this.categoryFilename = (String)this.settings.get("categories");
@@ -99,149 +94,214 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
     protected abstract T createGraphInstance() throws Exception;
     protected abstract void init();
 
-    protected void commit() {
-    }
-
     protected void load() throws IOException, InterruptedException {
         
         this.init();
 
         final long startTime = System.currentTimeMillis();
-        final boolean multithreaded = this.graph.getFeatures().supportsThreadedTransactions;
-
-        this.loadASINs(multithreaded);
-        this.loadUserIds(multithreaded);
-        this.loadCategoryPaths();
-        this.commit();
-
-        if (this.productReviewFilename != null) {
-            try { this.loadReviews(compact, multithreaded); }
-            catch (FileNotFoundException ex) {
-                logger.log(Level.WARNING, String.format(SKIP_MSG, "product reviews", this.productReviewFilename));
-            }
-        }
         
-        if (this.productTitleFilename != null) {
-            try { this.loadTitles(compact, multithreaded); }
-            catch (FileNotFoundException ex) {
-                logger.log(Level.WARNING, String.format(SKIP_MSG, "product titles", this.productTitleFilename));
-            }
+        if (this.multithreaded) {
+            this.loadMultiThreaded();
         }
-
-        if (this.categoryLinkFilename != null) {
-            try { this.loadCategoryLinks(multithreaded); }
-            catch (FileNotFoundException ex) {
-                logger.log(Level.WARNING, String.format(SKIP_MSG, "category links", this.categoryLinkFilename));
-            }
+        else {
+            this.loadASINs();
+            this.loadUserIds();
+            this.loadCategoryPaths();
+            this.loadReviews(compact);
+            this.loadTitles(compact);
+            this.loadCategoryLinks();
         }
-        
-        if (multithreaded) {
-            waitForAllTasks();
-        }
-        
-        this.commit();
 
         logger.log(Level.INFO, "LOAD TIME :: {0} ms", (System.currentTimeMillis() - startTime));
     }
     
-    private void loadASINs(final boolean multithreaded)
-            throws FileNotFoundException, InterruptedException, IOException {
+    protected void loadMultiThreaded() {
 
-        final KeyFileReader asins = new KeyFileReader(productASINFilename);
-        this.load(asins, new KeyLoader(Schema.Keys.PRODUCT_ASIN), multithreaded);
+        final GraphLoader loader = this;
+        final CountDownLatch asinLatch = new CountDownLatch(1);
+        final CountDownLatch userLatch = new CountDownLatch(1);
+        final CountDownLatch pathLatch = new CountDownLatch(1);
+        final CountDownLatch all = new CountDownLatch(6);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 1);
+                loader.loadASINs();
+                asinLatch.countDown();
+                all.countDown();
+            }
+        });
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
+                loader.loadUserIds();
+                userLatch.countDown();
+                all.countDown();
+            }
+        });
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                loader.loadCategoryPaths();
+                pathLatch.countDown();
+                all.countDown();
+            }
+        });
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    asinLatch.await();
+                    userLatch.await();
+                    Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+                    loader.loadReviews(compact);
+                }
+                catch (InterruptedException ex) {
+                    logger.log(Level.SEVERE, null, ex);
+                }
+                finally {
+                    all.countDown();
+                }
+            }
+        });
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    asinLatch.await();
+                    loader.loadTitles(compact);
+                }
+                catch (InterruptedException ex) {
+                    logger.log(Level.SEVERE, null, ex);
+                }
+                finally {
+                    all.countDown();
+                }
+            }
+        });
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    asinLatch.await();
+                    pathLatch.await();
+                    Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 1);
+                    loader.loadCategoryLinks();
+                }
+                catch (InterruptedException ex) {
+                    logger.log(Level.SEVERE, null, ex);
+                }
+                finally {
+                    all.countDown();
+                }
+            }
+        });
+
+        try {
+            all.await();
+        } catch (InterruptedException ex) {
+            logger.log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void loadASINs() {
+        try {
+            final KeyFileReader asins = new KeyFileReader(productASINFilename);
+            this.load(asins, new KeyLoader(Schema.Keys.PRODUCT_ASIN));
+        }
+        catch (IOException ex) {
+            logger.log(Level.SEVERE, null, ex);
+        }
     }
     
-    private void loadUserIds(final boolean multithreaded)
-            throws FileNotFoundException, InterruptedException, IOException {
-
-        final KeyFileReader userIds = new KeyFileReader(userIdFilename);
-        this.load(userIds, new KeyLoader(Schema.Keys.USER_ID), multithreaded);
+    private void loadUserIds() {
+        try {
+            final KeyFileReader userIds = new KeyFileReader(userIdFilename);
+            this.load(userIds, new KeyLoader(Schema.Keys.USER_ID));
+        }
+        catch (IOException ex) {
+            logger.log(Level.SEVERE, null, ex);
+        }
     }
     
-    private void loadCategoryPaths()
-            throws FileNotFoundException, InterruptedException, IOException {
-
-        final KeyFileReader paths = new KeyFileReader(categoryFilename);
-        this.load(paths, new CategoryPathLoader(), false);
+    private void loadCategoryPaths() {
+        try {
+            final KeyFileReader paths = new KeyFileReader(categoryFilename);
+            this.load(paths, new CategoryPathLoader());
+        }
+        catch (IOException ex) {
+            logger.log(Level.SEVERE, null, ex);
+        }
     }
-    
-    private void loadReviews(final boolean compact, final boolean multithreaded)
-            throws FileNotFoundException, InterruptedException {
+
+    private void loadReviews(final boolean compact) {
 
         try (ProductReviewFileReader productReviews = new ProductReviewFileReader(productReviewFilename, compact)) {
-            this.load(productReviews, new ProductReviewLoader(), multithreaded);
+            this.load(productReviews, new ProductReviewLoader());
         }
         catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
     }
     
-    private void loadTitles(final boolean compact, final boolean multithreaded)
-            throws FileNotFoundException, InterruptedException {
+    private void loadTitles(final boolean compact) {
 
         try (ProductTitleFileReader productTitles = new ProductTitleFileReader(productTitleFilename, compact)) {
-            this.load(productTitles, new ProductTitleLoader(), multithreaded);
+            this.load(productTitles, new ProductTitleLoader());
         }
         catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
     }
     
-    private void loadCategoryLinks(final boolean multithreaded)
-            throws FileNotFoundException, InterruptedException {
+    private void loadCategoryLinks() {
 
         try (CategoryLinkFileReader categories = new CategoryLinkFileReader(categoryLinkFilename)) {
-            this.load(categories, new CategoryLinkLoader(), multithreaded);
+            this.load(categories, new CategoryLinkLoader());
         }
         catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
     }
     
-    private <T> void load(final Iterable<T> reader, final VertexLoader loader, final boolean multithreaded)
-            throws InterruptedException {
+    private <T> void load(final Iterable<T> reader, final VertexLoader loader) {
 
-        if (!multithreaded) {
-            waitForAllTasks();
-        }
+        Graph g = this.getNextTransactionGraph();
+        long counter = 0L;
 
         final Iterator<T> itty = reader.iterator();
         while (itty.hasNext()) {
             final T item = itty.next();
             if (!(item instanceof AmazonEntity) || ((AmazonEntity)item).isValid()) {
-                semaphore.acquire();
-                loader.init(this, item, batchSize);
-                loadEntity(loader, multithreaded);
+                loader.init(g, item, batchSize);
+                loader.run();
+                if (++counter%batchSize == 0L) {
+                    this.commit(g);
+                    g = this.getNextTransactionGraph();
+                }
             }
         }
-        
-        if (!multithreaded) {
-            this.commit();
+
+        this.commit(g);
+    }
+
+    private void commit(final Graph g) {
+        if (g instanceof TransactionalGraph) {
+            ((TransactionalGraph)g).commit();
         }
     }
-    
-    private void loadEntity(final VertexLoader loader, final boolean multithreaded) {
-        if (multithreaded) {
-            executor.execute(loader);
+
+    private Graph getNextTransactionGraph() {
+        if (this.multithreaded) {
+            return ((ThreadedTransactionalGraph)this.graph).newTransaction();
         }
-        else {
-            loader.run();
-        }
-    }
-    
-    public Graph getGraph() {
         return this.graph;
-    }
-    
-    public void notifyEntityDone() {
-        semaphore.release();
-        if (counter.incrementAndGet()%batchSize == 0L) {
-            this.commit();
-        }
-    }
-    
-    private static void waitForAllTasks() throws InterruptedException {
-        semaphore.acquire(MAX_PARALLEL_TASKS);
-        semaphore.release(MAX_PARALLEL_TASKS);
     }
 }

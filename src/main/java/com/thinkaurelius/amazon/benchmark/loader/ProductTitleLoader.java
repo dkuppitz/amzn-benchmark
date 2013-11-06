@@ -23,17 +23,15 @@ public class ProductTitleLoader extends EntityLoader<Product> {
 
     @Override
     public void run() {
-        try {
-            final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, this.entity.ASIN).iterator();
-            if (productItty.hasNext()) {
-                setPropertyIfNotNull(productItty.next(), Schema.Keys.PRODUCT_TITLE, entity.title);
-                if (counter.incrementAndGet()%batchSize == 0L) {
-                    logger.log(Level.INFO, "PRODUCTS :: {0}", counter.get());
-                }
+        final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, this.entity.ASIN).iterator();
+        if (productItty.hasNext()) {
+            setPropertyIfNotNull(productItty.next(), Schema.Keys.PRODUCT_TITLE, entity.title);
+            if (counter.incrementAndGet()%batchSize == 0L) {
+                logger.log(Level.INFO, "PRODUCTS :: {0}", counter.get());
             }
         }
-        finally {
-            this.loader.notifyEntityDone();
+        else {
+            logger.log(Level.WARNING, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
         }
     }
 }

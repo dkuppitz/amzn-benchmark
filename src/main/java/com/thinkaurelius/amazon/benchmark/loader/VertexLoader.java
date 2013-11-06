@@ -4,7 +4,6 @@
  */
 package com.thinkaurelius.amazon.benchmark.loader;
 
-import com.thinkaurelius.amazon.benchmark.GraphLoader;
 import com.tinkerpop.blueprints.Graph;
 
 /**
@@ -13,14 +12,12 @@ import com.tinkerpop.blueprints.Graph;
  */
 public abstract class VertexLoader<T> implements Runnable {
     
-    protected GraphLoader loader;
     protected T entity;
     protected Graph graph;
     protected long batchSize;
 
-    public void init(final GraphLoader loader, final T entity, final long batchSize) {
-        this.loader = loader;
-        this.graph = loader.getGraph();
+    public void init(final Graph graph, final T entity, final long batchSize) {
+        this.graph = graph;
         this.entity = entity;
         this.batchSize = batchSize;
     }

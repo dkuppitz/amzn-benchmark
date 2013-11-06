@@ -24,25 +24,26 @@ public class ProductReviewLoader extends EntityLoader<ProductReview> {
 
     @Override
     public void run() {
-        if (entity.user.userId != null) {
-            try {
-                final Iterator<Vertex> userItty = this.graph.getVertices(Schema.Keys.USER_ID, entity.user.userId).iterator();
-                final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, entity.ASIN).iterator();
-                if (userItty.hasNext() && productItty.hasNext()) {
-                    final Edge reviewed = userItty.next().addEdge(Schema.Labels.REVIEWED, productItty.next());
-                    setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_TIME, entity.time);
-                    setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_HELPFULNESS, entity.helpfulness);
-                    setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_SCORE, entity.score);
-                    setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_SUMMARY, entity.summary);
-                    setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_TEXT, entity.text);
-                    if (counter.incrementAndGet()%batchSize == 0L) {
-                        logger.log(Level.INFO, "REVIEWS :: {0}", counter.get());
-                    }
+        final Iterator<Vertex> userItty = this.graph.getVertices(Schema.Keys.USER_ID, entity.user.userId).iterator();
+        if (userItty.hasNext()) {
+            final Iterator<Vertex> productItty = this.graph.getVertices(Schema.Keys.PRODUCT_ASIN, entity.ASIN).iterator();
+            if (productItty.hasNext()) {
+                final Edge reviewed = userItty.next().addEdge(Schema.Labels.REVIEWED, productItty.next());
+                setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_TIME, entity.time);
+                setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_HELPFULNESS, entity.helpfulness);
+                setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_SCORE, entity.score);
+                setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_SUMMARY, entity.summary);
+                setPropertyIfNotNull(reviewed, Schema.Keys.REVIEW_TEXT, entity.text);
+                if (counter.incrementAndGet()%batchSize == 0L) {
+                    logger.log(Level.INFO, "REVIEWS :: {0}", counter.get());
                 }
             }
-            finally {
-                this.loader.notifyEntityDone();
+            else {
+                logger.log(Level.WARNING, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
             }
+        }
+        else {
+            logger.log(Level.WARNING, "Cannot find user with ID ''{0}''", this.entity.user.userId);
         }
     }
 }

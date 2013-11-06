@@ -107,9 +107,4 @@ public class TitanLoader extends GraphLoader<TitanGraph> {
         }
         this.graph.commit();
     }
-    
-    @Override
-    protected void commit() {
-        this.graph.commit();
-    }
 }
