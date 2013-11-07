@@ -45,7 +45,7 @@ public class CategoryLinkLoader extends EntityLoader<CategoryRelations> {
             }
         }
         else {
-            logger.log(Level.WARNING, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
+            //logger.log(Level.OFF, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
         }
     }
 

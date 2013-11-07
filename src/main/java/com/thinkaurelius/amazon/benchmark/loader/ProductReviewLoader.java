@@ -39,11 +39,11 @@ public class ProductReviewLoader extends EntityLoader<ProductReview> {
                 }
             }
             else {
-                logger.log(Level.WARNING, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
+                //logger.log(Level.OFF, "Cannot find product with ASIN ''{0}''", this.entity.ASIN);
             }
         }
         else {
-            logger.log(Level.WARNING, "Cannot find user with ID ''{0}''", this.entity.user.userId);
+            //logger.log(Level.OFF, "Cannot find user with ID ''{0}''", this.entity.user.userId);
         }
     }
 }
