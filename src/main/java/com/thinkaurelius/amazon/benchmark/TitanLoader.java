@@ -46,6 +46,7 @@ public class TitanLoader extends GraphLoader<TitanGraph> {
         final Boolean sorted = (Boolean)this.settings.get("sorted");
         final String index = (String)this.settings.get("index");
 
+        TitanType time = this.graph.getType(Schema.Keys.REVIEW_TIME);
         TitanType score = this.graph.getType(Schema.Keys.REVIEW_SCORE);
 
         if (this.graph.getType(Schema.Keys.PRODUCT_ASIN) == null) {
@@ -71,8 +72,8 @@ public class TitanLoader extends GraphLoader<TitanGraph> {
             }
             userName.make();
         }
-        if (this.graph.getType(Schema.Keys.REVIEW_TIME) == null) {
-            this.graph.makeKey(Schema.Keys.REVIEW_TIME).dataType(Long.class).single().make();
+        if (time == null) {
+            time = this.graph.makeKey(Schema.Keys.REVIEW_TIME).dataType(Long.class).single().make();
         }
         if (score == null) {
             score = this.graph.makeKey(Schema.Keys.REVIEW_SCORE).dataType(Float.class).single().make();
@@ -102,7 +103,7 @@ public class TitanLoader extends GraphLoader<TitanGraph> {
         }
         if (this.graph.getType(Schema.Labels.REVIEWED) == null) {
             final LabelMaker reviewed = this.graph.makeLabel(Schema.Labels.REVIEWED);
-            if (sorted) reviewed.sortKey(score);
+            if (sorted) reviewed.sortKey(time, score);
             reviewed.make();
         }
         this.graph.commit();
