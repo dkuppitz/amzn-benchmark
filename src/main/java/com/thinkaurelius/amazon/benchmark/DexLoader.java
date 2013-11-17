@@ -1,7 +1,18 @@
 package com.thinkaurelius.amazon.benchmark;
 
+import com.thinkaurelius.amazon.benchmark.input.CategoryLinkFileReader;
+import com.thinkaurelius.amazon.benchmark.input.KeyFileReader;
+import com.thinkaurelius.amazon.benchmark.input.ProductReviewFileReader;
+import com.thinkaurelius.amazon.benchmark.input.ProductTitleFileReader;
+import com.thinkaurelius.amazon.benchmark.loader.CategoryLinkLoader;
+import com.thinkaurelius.amazon.benchmark.loader.CategoryPathLoader;
+import com.thinkaurelius.amazon.benchmark.loader.KeyLoader;
+import com.thinkaurelius.amazon.benchmark.loader.ProductReviewLoader;
+import com.thinkaurelius.amazon.benchmark.loader.ProductTitleLoader;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.dex.DexGraph;
+import java.io.IOException;
+import java.util.logging.Level;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 
 public class DexLoader extends GraphLoader<DexGraph> {
@@ -32,9 +43,30 @@ public class DexLoader extends GraphLoader<DexGraph> {
 
     @Override
     protected void init() {
+        this.graph.label.set("product");
         this.graph.createKeyIndex(Schema.Keys.PRODUCT_ASIN, Vertex.class);
+        this.graph.label.set("category");
         this.graph.createKeyIndex(Schema.Keys.CATEGORY_NAME, Vertex.class);
+        this.graph.label.set("user");
         this.graph.createKeyIndex(Schema.Keys.USER_ID, Vertex.class);
         this.graph.commit();
+    }
+    
+    @Override
+    protected void loadASINs() {
+        this.graph.label.set("product");
+        super.loadASINs();
+    }
+
+    @Override
+    protected void loadUserIds() {
+        this.graph.label.set("user");
+        super.loadUserIds();
+    }
+    
+    @Override
+    protected void loadCategoryPaths() {
+        this.graph.label.set("category");
+        super.loadCategoryPaths();
     }
 }

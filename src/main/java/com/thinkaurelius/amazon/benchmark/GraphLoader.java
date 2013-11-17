@@ -211,7 +211,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
 
-    private void loadASINs() {
+    protected void loadASINs() {
         try {
             final KeyFileReader asins = new KeyFileReader(productASINFilename);
             this.load(asins, new KeyLoader(Schema.Keys.PRODUCT_ASIN));
@@ -221,7 +221,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
     
-    private void loadUserIds() {
+    protected void loadUserIds() {
         try {
             final KeyFileReader userIds = new KeyFileReader(userIdFilename);
             this.load(userIds, new KeyLoader(Schema.Keys.USER_ID));
@@ -231,7 +231,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
     
-    private void loadCategoryPaths() {
+    protected void loadCategoryPaths() {
         try {
             final KeyFileReader paths = new KeyFileReader(categoryFilename);
             this.load(paths, new CategoryPathLoader());
@@ -241,7 +241,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
 
-    private void loadReviews(final boolean compact) {
+    protected void loadReviews(final boolean compact) {
 
         try (ProductReviewFileReader productReviews = new ProductReviewFileReader(productReviewFilename, compact)) {
             this.load(productReviews, new ProductReviewLoader());
@@ -251,7 +251,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
     
-    private void loadTitles(final boolean compact) {
+    protected void loadTitles(final boolean compact) {
 
         try (ProductTitleFileReader productTitles = new ProductTitleFileReader(productTitleFilename, compact)) {
             this.load(productTitles, new ProductTitleLoader());
@@ -261,7 +261,7 @@ public abstract class GraphLoader<T extends Graph> implements Closeable {
         }
     }
     
-    private void loadCategoryLinks() {
+    protected void loadCategoryLinks() {
 
         try (CategoryLinkFileReader categories = new CategoryLinkFileReader(categoryLinkFilename)) {
             this.load(categories, new CategoryLinkLoader());
