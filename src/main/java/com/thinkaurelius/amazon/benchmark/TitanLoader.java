@@ -103,7 +103,7 @@ public class TitanLoader extends GraphLoader<TitanGraph> {
         }
         if (this.graph.getType(Schema.Labels.REVIEWED) == null) {
             final LabelMaker reviewed = this.graph.makeLabel(Schema.Labels.REVIEWED);
-            if (sorted) reviewed.sortKey(time, score);
+            if (sorted) reviewed.sortKey(score, time);
             reviewed.make();
         }
         this.graph.commit();
