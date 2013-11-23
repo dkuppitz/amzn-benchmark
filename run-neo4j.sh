@@ -1,13 +1,11 @@
 #!/bin/bash
 
-rm -rf /data/amzn/neo-graph
-
-OPTS="-Xms10G -Xmx25G -XX:-HeapDumpOnOutOfMemoryError -javaagent:./lib/jamm-0.2.5.jar -cp target/Amazon-1.0-SNAPSHOT.jar:.:target/lib/*"
+OPTS="-Xms10G -Xmx25G -XX:-HeapDumpOnOutOfMemoryError -javaagent:target/lib/jamm-0.2.5.jar -cp target/Amazon-1.0-SNAPSHOT.jar:.:target/lib/*"
 java $OPTS com.thinkaurelius.amazon.benchmark.Neo4jLoader \
-	--path /data/amzn/neo-graph                       \
-	-a /data/amzn/asins.txt.gz                        \
-	-u /data/amzn/userids.txt.gz                      \
-	-c /data/amzn/category-paths.txt.gz               \
-	-t /data/amzn/titles.utf8.gz                      \
-	-r /data/amzn/all.utf8.gz                         \
-	-l /data/amzn/categories.utf8.gz $@
+	--path /mnt/data/amzn/neo-graph                       \
+	-a /mnt/data/amzn/asins.txt.gz                        \
+	-u /mnt/data/amzn/userids.txt.gz                      \
+	-c /mnt/data/amzn/category-paths.txt.gz               \
+	-t /mnt/data/amzn/titles.utf8.gz                      \
+	-r /mnt/data/amzn/all.utf8.gz                         \
+	-l /mnt/data/amzn/categories.utf8.gz $@
