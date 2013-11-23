@@ -1,6 +1,8 @@
 Amazon Graph Benchmark
 ======================
 
+The included shell scripts (helper scripts to run the actual import) assume that your $DATA_DIR is /mnt/data/amzn. If you choose another directory, you'll need to adjust the shell scripts accordingly.
+
 ## Download input files
 
 ```shell
